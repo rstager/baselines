@@ -41,7 +41,7 @@ class CnnPolicy(object):
 
 
 class GaussianMlpPolicy(object):
-    def __init__(self, ob_dim, ac_dim):
+    def __init__(self, ob_dim, ac_dim,hid_layers=[64,64]):
         # Here we'll construct a bunch of expressions, which will be used in two places:
         # (1) When sampling actions
         # (2) When computing loss functions, for the policy update
@@ -53,9 +53,11 @@ class GaussianMlpPolicy(object):
         adv_n = tf.placeholder(tf.float32, shape=[None], name="adv") # advantage function estimate
         oldlogprob_n = tf.placeholder(tf.float32, shape=[None], name='oldlogprob') # log probability of previous actions
         wd_dict = {}
-        h1 = tf.nn.tanh(dense(ob_no, 64, "h1", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
-        h2 = tf.nn.tanh(dense(h1, 64, "h2", weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
-        mean_na = dense(h2, ac_dim, "mean", weight_init=U.normc_initializer(0.1), bias_init=0.0, weight_loss_dict=wd_dict) # Mean control output
+        hn=ob_no
+        self.hid_layers=hid_layers
+        for i,l in enumerate(hid_layers):
+            hn = tf.nn.tanh(dense(hn, l, "h{}".format(i), weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+        mean_na = dense(hn, ac_dim, "mean", weight_init=U.normc_initializer(0.1), bias_init=0.0, weight_loss_dict=wd_dict) # Mean control output
         self.wd_dict = wd_dict
         self.logstd_1a = logstd_1a = tf.get_variable("logstd", [ac_dim], tf.float32, tf.zeros_initializer()) # Variance on outputs
         logstd_1a = tf.expand_dims(logstd_1a, 0)

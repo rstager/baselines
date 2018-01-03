@@ -1,5 +1,7 @@
 import numpy as np
 import tensorflow as tf
+from gym.spaces import Box
+
 from baselines import logger
 from baselines import common
 from baselines.common import tf_util as U
@@ -48,7 +50,12 @@ def rollout(env, policy, max_pathlength, animate=False, obfilter=None):
 def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
     animate=False, callback=None, optimizer="adam", desired_kl=0.002):
 
-    obfilter = ZFilter(env.observation_space.shape)
+    if isinstance(env.observation_space, Box):
+        ob_dim = env.observation_space.shape
+    else:
+        ob_dim = env.observation_space.spaces[0].shape
+
+    obfilter = ZFilter(ob_dim)
 
     max_pathlength = env.spec.timestep_limit
     stepsize = tf.Variable(initial_value=np.float32(np.array(0.03)), name='stepsize')
@@ -133,6 +140,6 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
         logger.record_tabular("EpLenMean", np.mean([pathlength(path) for path in paths]))
         logger.record_tabular("KL", kl)
         if callback:
-            callback()
+            callback(locals(),globals())
         logger.dump_tabular()
         i += 1
