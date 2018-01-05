@@ -77,3 +77,15 @@ class GaussianMlpPolicy(object):
     def act(self, ob):
         ac, ac_dist, logp = self._act(ob[None])
         return ac[0], ac_dist[0], logp[0]
+
+class GaussianImageMlpPolicy(GaussianMlpPolicy):
+    def __init__(self, cnn, **kwargs):
+        self.cnn=cnn
+        super().__init__(**kwargs)
+
+    def act(self,ob):
+        sensors,cam0,cam1=ob
+        cam0state=self.cnn.predict(cam0)
+        cam1state=self.cnn.predict(cam1)
+        ob2=np.hstack([sensors,cam0state,cam1state])
+        return super().act(ob2)
