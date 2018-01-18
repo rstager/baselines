@@ -7,13 +7,17 @@ from baselines.acktr import kfac
 from baselines.acktr.utils import dense
 
 class NeuralNetValueFunction(object):
-    def __init__(self, ob_dim, ac_dim): #pylint: disable=W0613
+    def __init__(self, ob_dim, ac_dim,hid_layers=[64,64]): #pylint: disable=W0613
         X = tf.placeholder(tf.float32, shape=[None, ob_dim*2+ac_dim*2+2]) # batch of observations
         vtarg_n = tf.placeholder(tf.float32, shape=[None], name='vtarg')
         wd_dict = {}
-        h1 = tf.nn.elu(dense(X, 64, "h1", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
-        h2 = tf.nn.elu(dense(h1, 64, "h2", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
-        vpred_n = dense(h2, 1, "hfinal", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict)[:,0]
+        #h1 = tf.nn.elu(dense(X, 64, "h1", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
+        #h2 = tf.nn.elu(dense(h1, 64, "h2", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict))
+        hn=X
+        self.hid_layers=hid_layers
+        for i,l in enumerate(hid_layers):
+            hn = tf.nn.elu(dense(hn, l, "h{}".format(i), weight_init=U.normc_initializer(1.0), bias_init=0.0, weight_loss_dict=wd_dict))
+        vpred_n = dense(hn, 1, "hfinal", weight_init=U.normc_initializer(1.0), bias_init=0, weight_loss_dict=wd_dict)[:,0]
         sample_vpred_n = vpred_n + tf.random_normal(tf.shape(vpred_n))
         wd_loss = tf.get_collection("vf_losses", None)
         loss = U.mean(tf.square(vpred_n - vtarg_n)) + tf.add_n(wd_loss)
