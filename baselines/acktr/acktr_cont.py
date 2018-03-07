@@ -7,6 +7,9 @@ from baselines import common
 from baselines.common import tf_util as U
 from baselines.acktr import kfac
 from baselines.acktr.filters import ZFilter
+import csv
+import time
+import os
 
 def pathlength(path):
     return path["reward"].shape[0]# Loss function that we'll differentiate to get the policy gradient
@@ -48,7 +51,7 @@ def rollout(env, policy, max_pathlength, animate=False, obfilter=None):
             "action_dist": np.array(ac_dists), "logp" : np.array(logps)}
 
 def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
-    animate=False, callback=None, desired_kl=0.002):
+    animate=False, callback=None, desired_kl=0.002, post_init_callback=None):
 
     if isinstance(env.observation_space, Box):
         ob_dim = env.observation_space.shape
@@ -71,7 +74,8 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
     update_op, q_runner = optim.minimize(loss, loss_sampled, var_list=pi_var_list)
     do_update = U.function(inputs, update_op)
     U.initialize()
-
+    if post_init_callback is not None:
+        post_init_callback()
     # start queue runners
     enqueue_threads = []
     coord = tf.train.Coordinator()
@@ -85,7 +89,7 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
         if timesteps_so_far > num_timesteps:
             break
         logger.log("********** Iteration %i ************"%i)
-
+        start_time = time.time()
         # Collect paths until we have enough timesteps
         timesteps_this_batch = 0
         paths = []
@@ -135,11 +139,20 @@ def learn(env, policy, vf, gamma, lam, timesteps_per_batch, num_timesteps,
             U.eval(tf.assign(stepsize, tf.minimum(max_stepsize, stepsize * 1.5)))            
         else:
             logger.log("kl just right!")
+        training_time = (time.time() - start_time)/60
+        logger.log("training time is %f minutes" % training_time)
 
-        logger.record_tabular("EpRewMean", np.mean([path["reward"].sum() for path in paths]))
-        logger.record_tabular("EpRewSEM", np.std([path["reward"].sum()/np.sqrt(len(paths)) for path in paths]))
-        logger.record_tabular("EpLenMean", np.mean([pathlength(path) for path in paths]))
+        EpRewMean = np.mean([path["reward"].sum() for path in paths])
+        EpRewSEM = np.std([path["reward"].sum() / np.sqrt(len(paths)) for path in paths])
+        EpLenMean = np.mean([pathlength(path) for path in paths])
+        logger.record_tabular("EpRewMean", EpRewMean)
+        logger.record_tabular("EpRewSEM", EpRewSEM)
+        logger.record_tabular("EpLenMean", EpLenMean)
         logger.record_tabular("KL", kl)
+        with open('training_monitor.csv', 'a') as f:
+            writer = csv.writer(f)
+            writer.writerow([EpLenMean, EpRewMean, EpRewSEM, kl])
+
         if callback:
             callback(locals(),globals())
         logger.dump_tabular()
