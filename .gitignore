@@ -15,7 +15,7 @@ keys/
 /env
 
 
-*.sublime-project
+*.sublime-projection
 *.sublime-workspace
 
 .idea
